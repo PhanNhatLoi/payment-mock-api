@@ -19,6 +19,7 @@ const {
   PAYPAL_CLIENT_SECRET,
   STRIPE_SECRET_KEY,
   PORT = 4242,
+  BASE_URL,
 } = process.env;
 
 // Initialize Stripe
@@ -39,18 +40,19 @@ const ordersController = new OrdersController(paypalClient);
 // Existing Stripe payment sheet endpoint
 app.get("/payment-sheet", async (req, res) => {
   try {
-    const email = "leo@gmail.com".toString();
-    const customerId = await getOrCreateStripeCustomerByEmail(email);
+    const customer = await stripeClient.customers.create({
+      email: "leo@gmail.com",
+    });
 
     const ephemeralKey = await stripeClient.ephemeralKeys.create(
-      { customer: customerId },
-      { apiVersion: "2022-11-15" }
+      { customer: customer.id },
+      { apiVersion: "2025-07-30.basil" }
     );
 
     const paymentIntent = await stripeClient.paymentIntents.create({
       amount: 1000,
       currency: "usd",
-      customer: customerId,
+      customer: customer.id,
       automatic_payment_methods: { enabled: true },
       // automatic_payment_methods: { enabled: false },
       // payment_method_types: ["card"],
@@ -59,7 +61,7 @@ app.get("/payment-sheet", async (req, res) => {
     res.json({
       paymentIntent: paymentIntent.client_secret,
       ephemeralKey: ephemeralKey.secret,
-      customer: customerId,
+      customer: customer.id,
     });
   } catch (err) {
     console.error(err);
@@ -127,31 +129,6 @@ app.get("/paypal-order", async (req, res) => {
     res.status(500).json({ error: "Failed to create order." });
   }
 });
-
-/**
- * Capture payment for the created order to complete the transaction.
- * @see https://developer.paypal.com/docs/api/orders/v2/#orders_capture
- */
-const captureOrder = async (orderID) => {
-  const collect = {
-    id: orderID,
-    prefer: "return=minimal",
-  };
-
-  try {
-    const { body, ...httpResponse } = await ordersController.captureOrder(
-      collect
-    );
-    return {
-      jsonResponse: JSON.parse(body),
-      httpStatusCode: httpResponse.statusCode,
-    };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw new Error(error.message);
-    }
-  }
-};
 
 app.get("/paypal-success", async (req, res) => {
   const { token, PayerID } = req.query;
