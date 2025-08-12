@@ -89,8 +89,8 @@ const createOrder = async () => {
         paypal: {
           emailAddress: "leo-personal@gmail.com",
           experienceContext: {
-            returnUrl: `${process.env.BASE_URL}/paypal-success`,
-            cancelUrl: `${process.env.BASE_URL}/paypal-cancel`,
+            returnUrl: `${BASE_URL}/paypal-success`,
+            cancelUrl: `${BASE_URL}/paypal-cancel`,
           },
         },
       },
@@ -210,6 +210,127 @@ app.get("/paypal-cancel", (req, res) => {
   `;
 
   res.send(cancelHtml);
+});
+
+app.get("/nicepay-order", async (req, res) => {
+  try {
+    const response = await fetch(
+      "https://dev.nicepay.co.id/nicepay/redirect/v2/registration",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          timeStamp: "20250211090266",
+          iMid: "IONPAYTEST",
+          payMethod: "00",
+          currency: "IDR",
+          amt: "10000",
+          referenceNo: "ORD20250211090266",
+          goodsNm: "Jhon Doe",
+          billingNm: "Jhon Doe",
+          billingPhone: "08123456789",
+          billingEmail: "jhondoe@gmail.com",
+          billingAddr: "Jalan Bukit Berbunga 22",
+          billingCity: "Jakarta",
+          billingState: "DKI Jakarta",
+          billingPostCd: "12345",
+          billingCountry: "Indonesia",
+          deliveryNm: "jhondoe@gmail.com",
+          deliveryPhone: "08123456789",
+          deliveryAddr: "Jalan Bukit Berbunga 22",
+          deliveryCity: "Jakarta",
+          deliveryState: "DKI Jakarta",
+          deliveryPostCd: "12345",
+          deliveryCountry: "Indonesia",
+          dbProcessUrl: "http://ptsv2.com/t/Merchant/post",
+          callBackUrl: `${BASE_URL}/nicepay-success`,
+          vat: "",
+          fee: "",
+          notaxAmt: "",
+          description: "Test Transaction Nicepay",
+          merchantToken:
+            "d339576df6d69763073b626fc88b0bbe9e0f9023d376d37372e1af96dde7d059",
+          reqDt: "",
+          reqTm: "",
+          reqDomain: "merchant.com",
+          reqServerIP: "127.0.0.1",
+          reqClientVer: "",
+          userIP: "127.0.0.1",
+          userSessionID: "697D6922C961070967D3BA1BA5699C2C",
+          userAgent:
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,like Gecko) Chrome/60.0.3112.101 Safari/537.36",
+          userLanguage: "ko-KR,en-US;q=0.8,ko;q=0.6,en;q=0.4",
+          cartData:
+            '{"count":"1","item":[{"goods_id":"BB12345678","goods_detail":"BB12345678","goods_name":"Pasar Modern","goods_amt":"10000","goods_type":"Sembako","goods_url":"http://merchant.com/cellphones/iphone5s_64g","goods_quantity":"1","goods_sellers_id":"SEL123","goods_sellers_name":"Sellers 1"}]}',
+          sellers:
+            '[{"sellersId": "SEL123","sellersNm": "Sellers 1","sellersEmail":"sellers@test.com","sellersAddress": {"sellerNm": "Sellers","sellerLastNm": "1","sellerAddr": "jalan berbangsa 1","sellerCity":"Jakarta Barat","sellerPostCd": "12344","sellerPhone":"08123456789","sellerCountry": "ID"}}]',
+          instmntType: "2",
+          instmntMon: "1",
+          recurrOpt: "1",
+          bankCd: "",
+          vacctValidDt: "",
+          vacctValidTm: "",
+          payValidDt: "",
+          payValidTm: "",
+          merFixAcctId: "",
+          mitraCd: "",
+          paymentExpDt: "",
+          paymentExpTm: "",
+          shopId: "",
+        }),
+      }
+    );
+
+    const data = await response.json();
+    const nicePayUrl = data.paymentURL + "?tXid=" + data.tXid;
+    res.json({ ...data, nicePayUrl });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Payment request failed" });
+  }
+});
+
+app.post("/nicepay-success", async (req, res) => {
+  const { token, PayerID } = {
+    token: "YI-4932",
+    PayerID: "1234567890",
+  };
+  const appDeepLink = `aitravel://app/booking_submitted?bookingId=${token}`;
+
+  const successHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8" />
+      <title>Payment Success</title>
+      <style>
+        body { font-family: sans-serif; text-align: center; padding: 2rem; }
+      </style>
+    </head>
+    <body>
+      <h2>Thanh toán thành công!</h2>
+      <p>Order ID: ${token}</p>
+      <p>Payer ID: ${PayerID}</p>
+      <p>Bạn sẽ được chuyển đến app trong giây lát...</p>
+
+      <script>
+        // Chuyển hướng sang deep link mở app
+        setTimeout(() => {
+          window.location.href = '${appDeepLink}';
+        }, 2000);
+
+        // Thêm fallback nếu browser không mở được app, chuyển về trang web hoặc thông báo
+        setTimeout(() => {
+          document.body.innerHTML += '<p>Nếu app không tự mở, vui lòng <a href="${appDeepLink}">bấm vào đây</a>.</p>';
+        }, 2500);
+      </script>
+    </body>
+    </html>
+  `;
+
+  res.send(successHtml);
 });
 
 app.listen(PORT, () => {
