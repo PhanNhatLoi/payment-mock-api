@@ -293,11 +293,8 @@ app.get("/nicepay-order", async (req, res) => {
 });
 
 app.post("/nicepay-success", async (req, res) => {
-  const { token, PayerID } = {
-    token: "YI-4932",
-    PayerID: "1234567890",
-  };
-  const appDeepLink = `aitravel://app/booking_submitted?bookingId=${token}`;
+  const token = "YI-4932";
+  const PayerID = "1234567890";
 
   const successHtml = `
     <!DOCTYPE html>
@@ -307,6 +304,7 @@ app.post("/nicepay-success", async (req, res) => {
       <title>Payment Success</title>
       <style>
         body { font-family: sans-serif; text-align: center; padding: 2rem; }
+        h2 { color: #4CAF50; }
       </style>
     </head>
     <body>
@@ -316,15 +314,12 @@ app.post("/nicepay-success", async (req, res) => {
       <p>Bạn sẽ được chuyển đến app trong giây lát...</p>
 
       <script>
-        // Chuyển hướng sang deep link mở app
-        setTimeout(() => {
-          window.location.href = '${appDeepLink}';
-        }, 2000);
-
-        // Thêm fallback nếu browser không mở được app, chuyển về trang web hoặc thông báo
-        setTimeout(() => {
-          document.body.innerHTML += '<p>Nếu app không tự mở, vui lòng <a href="${appDeepLink}">bấm vào đây</a>.</p>';
-        }, 2500);
+        // Gửi sự kiện về React Native WebView
+        window.ReactNativeWebView?.postMessage(JSON.stringify({
+          status: 'success',
+          token: '${token}',
+          payerId: '${PayerID}'
+        }));
       </script>
     </body>
     </html>
