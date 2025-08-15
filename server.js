@@ -69,6 +69,20 @@ app.get("/payment-sheet", async (req, res) => {
   }
 });
 
+app.get("/stripe/setup-intent", async (req, res) => {
+  const customer = await stripeClient.customers.create({
+    email: "leo@gmail.com",
+  });
+
+  const si = await stripeClient.setupIntents.create({
+    customer: customer.id,
+    usage: "off_session",
+  });
+  res.json({
+    clientSecret: si.client_secret,
+  });
+});
+
 /**
  * Create an order to start the transaction.
  * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create
