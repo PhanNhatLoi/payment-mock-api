@@ -342,6 +342,58 @@ app.post("/nicepay-success", async (req, res) => {
   res.send(successHtml);
 });
 
+app.get("/eximbay-order", async (req, res) => {
+  const successHtml = ` <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Eximbay Payment Test</title>
+    <script src="https://api-test.eximbay.com/v2/javascriptSDK.js"></script>
+  </head>
+  <body>
+    <h2>Eximbay Payment Test</h2>
+    <button type="button" onclick="payment();">Start Payment</button>
+
+    <script type="text/javascript">
+      const paymentPayload = {
+        fgkey:
+          "BC38BE592FB4302D5BE2BB8E6CD59A4E20E5A8C06FBF67BE264F8C2B63B20005",
+        payment: {
+          transaction_type: "AUTHORIZE",
+          order_id: "50",
+          currency: "USD",
+          amount: "328.90",
+          lang: "EN",
+        },
+        merchant: {
+          mid: "1849705C64",
+        },
+        buyer: {
+          name: "test",
+          email: "test@gmail.com",
+        },
+        url: {
+          return_url:
+            "ai_travel://webhook-test.com/c97542387ed416d6160295910f6528b9",
+          status_url:
+            "https://ai-travel-api.axndx.org/api/v1/payment/eximbay/webhook",
+        },
+      };
+
+      function payment() {
+        console.log("👉 Calling EXIMBAY.request_pay with:", paymentPayload);
+
+        EXIMBAY.request_pay(paymentPayload);
+
+        console.log("✅ request_pay called");
+      }
+    </script>
+  </body>
+</html>`;
+
+  res.send(successHtml);
+});
+
 app.listen(PORT, () => {
   console.log(`Node server listening at http://localhost:${PORT}/`);
 });
