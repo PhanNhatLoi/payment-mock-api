@@ -8,7 +8,17 @@ import {
 } from "@paypal/paypal-server-sdk";
 import bodyParser from "body-parser";
 import cors from "cors";
-import stripe from "stripe";
+
+const widgetSecretKey = "test_gsk_docs_OaPz8L5KdmQXkzRz3y47BMw6";
+const apiSecretKey = "test_sk_ALnQvDd2VJz0kQyOWeeeVMj7X41m";
+
+// 토스페이먼츠 API는 시크릿 키를 사용자 ID로 사용하고, 비밀번호는 사용하지 않습니다.
+// 비밀번호가 없다는 것을 알리기 위해 시크릿 키 뒤에 콜론을 추가합니다.
+// @docs https://docs.tosspayments.com/reference/using-api/authorization#%EC%9D%B8%EC%A6%9D
+const encryptedWidgetSecretKey =
+  "Basic " + Buffer.from(widgetSecretKey + ":").toString("base64");
+const encryptedApiSecretKey =
+  "Basic " + Buffer.from(apiSecretKey + ":").toString("base64");
 
 const app = express();
 app.use(cors());
@@ -17,13 +27,9 @@ app.use(bodyParser.json());
 const {
   PAYPAL_CLIENT_ID,
   PAYPAL_CLIENT_SECRET,
-  STRIPE_SECRET_KEY,
   PORT = 4242,
   BASE_URL,
 } = process.env;
-
-// Initialize Stripe
-const stripeClient = stripe(STRIPE_SECRET_KEY);
 
 // Initialize PayPal
 const paypalClient = new Client({
@@ -36,52 +42,6 @@ const paypalClient = new Client({
 });
 
 const ordersController = new OrdersController(paypalClient);
-
-// Existing Stripe payment sheet endpoint
-app.get("/payment-sheet", async (req, res) => {
-  try {
-    const customer = await stripeClient.customers.create({
-      email: "leo@gmail.com",
-    });
-
-    const ephemeralKey = await stripeClient.ephemeralKeys.create(
-      { customer: customer.id },
-      { apiVersion: "2025-07-30.basil" }
-    );
-
-    const paymentIntent = await stripeClient.paymentIntents.create({
-      amount: 1000,
-      currency: "usd",
-      customer: customer.id,
-      automatic_payment_methods: { enabled: true },
-      // automatic_payment_methods: { enabled: false },
-      // payment_method_types: ["card"],
-    });
-
-    res.json({
-      paymentIntent: paymentIntent.client_secret,
-      ephemeralKey: ephemeralKey.secret,
-      customer: customer.id,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get("/stripe/setup-intent", async (req, res) => {
-  const customer = await stripeClient.customers.create({
-    email: "leo@gmail.com",
-  });
-
-  const si = await stripeClient.setupIntents.create({
-    customer: customer.id,
-    usage: "off_session",
-  });
-  res.json({
-    clientSecret: si.client_secret,
-  });
-});
 
 /**
  * Create an order to start the transaction.
@@ -395,6 +355,118 @@ app.get("/eximbay-order", async (req, res) => {
     </script>
   </body>
 </html>`;
+
+  res.send(successHtml);
+});
+
+app.post("/toss-order", async (req, res) => {
+  try {
+    const orderId = "v3K09uON6Cqth72dxtIBN";
+    const amount = 50000;
+    const appDeepLink = `aitravel://app/booking_submitted?bookingId=1111`;
+
+    const response = await fetch("https://api.tosspayments.com/v1/payments", {
+      method: "POST",
+      headers: {
+        Authorization: encryptedApiSecretKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        method: "CARD",
+        amount,
+        orderId,
+        orderName: "Toss T-shirts",
+        successUrl: `${BASE_URL}/toss-success`,
+        failUrl: `${BASE_URL}/toss-fail`,
+        appScheme: appDeepLink,
+      }),
+    });
+
+    const data = await response.json();
+
+    res.json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Payment request failed" });
+  }
+});
+
+app.get("/toss-success", async (req, res) => {
+  const { orderId } = req.query;
+
+  // Deep link app bạn muốn redirect tới, có thể build tùy ý với param
+  const appDeepLink = `aitravel://app/booking_submitted?bookingId=${orderId}`;
+
+  const successHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8" />
+      <title>Payment Success</title>
+      <style>
+        body { font-family: sans-serif; text-align: center; padding: 2rem; }
+      </style>
+    </head>
+    <body>
+      <h2>Thanh toán thành công!</h2>
+      <p>Order ID: ${orderId}</p>
+      <p>Bạn sẽ được chuyển đến app trong giây lát...</p>
+
+      <script>
+        // Chuyển hướng sang deep link mở app
+        setTimeout(() => {
+          window.location.href = '${appDeepLink}';
+        }, 2000);
+
+        // Thêm fallback nếu browser không mở được app, chuyển về trang web hoặc thông báo
+        setTimeout(() => {
+          document.body.innerHTML += '<p>Nếu app không tự mở, vui lòng <a href="${appDeepLink}">bấm vào đây</a>.</p>';
+        }, 2500);
+      </script>
+    </body>
+    </html>
+  `;
+
+  res.send(successHtml);
+});
+
+app.get("/toss-fail", async (req, res) => {
+  const { orderId, message, code } = req.query;
+
+  const appDeepLink = `aitravel://`;
+
+  const successHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8" />
+      <title>Payment Failed</title>
+      <style>
+        body { font-family: sans-serif; text-align: center; padding: 2rem; }
+      </style>
+    </head>
+    <body>
+      <h2>Thanh toán thất bại!</h2>
+      <p>Order ID: ${orderId}</p>
+      <p>Error Code: ${code}</p>
+      <p>Message Error: ${message}</p>
+
+      <p>Bạn sẽ được chuyển đến app trong giây lát...</p>
+
+      <script>
+        // Chuyển hướng sang deep link mở app
+        setTimeout(() => {
+          window.location.href = '${appDeepLink}';
+        }, 1000);
+
+        // Thêm fallback nếu browser không mở được app, chuyển về trang web hoặc thông báo
+        setTimeout(() => {
+          document.body.innerHTML += '<p>Nếu app không tự mở, vui lòng <a href="${appDeepLink}">bấm vào đây</a>.</p>';
+        }, 1500);
+      </script>
+    </body>
+    </html>
+  `;
 
   res.send(successHtml);
 });
